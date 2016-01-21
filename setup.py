@@ -14,5 +14,11 @@ setup(
     url="http://github.com/hevi9/" + NAME,
     packages=[NAME],
     setup_requires=["setuptools_scm"],
-    use_scm_version=True
+    use_scm_version=True,
+    entry_points={
+        "console_scripts": [
+            "lndirs=lndirs:main",
+        ]
+    }
+
 )
