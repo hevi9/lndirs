@@ -15,12 +15,6 @@ except pkg_resources.DistributionNotFound:
 log = logging.getLogger(NAME)
 D = log.debug
 
-
-CFG = {
-    "target": None,
-    "sources": []
-}
-
 ARGS = argparse.ArgumentParser()
 ARGS.add_argument("--version",
                   action="version",
@@ -29,6 +23,14 @@ ARGS.add_argument("--version",
 ARGS.add_argument("-d", "--debug",
                   action="store_true",
                   help="set debug/development mode on"
+                  )
+ARGS.add_argument("-c", "--clean",
+                  action="store_true",
+                  help="clean target links"
+                  )
+ARGS.add_argument("-s", "--show",
+                  action="store_true",
+                  help="show links to be done (no action)"
                   )
 ARGS.add_argument("-t", "--target",
                   required=True,
@@ -42,56 +44,102 @@ ARGS.add_argument("sources",
 
 
 class TargetFile:
-
-    def __init__(self, target_path, source_path):
-        self.target_path = target_path
+    def __init__(self, target_root, target_path, source_path):
+        self.target_root = target_root
+        self.target_path = target_path  # relative to root
         self.source_path = source_path
 
     def __repr__(self):
         return "%r -> %r" % (self.target_path, self.source_path)
 
+    @property
+    def abspath(self):
+        return j(self.target_root, self.target_path)
+
     def link(self):
-        os.makedirs(os.path.dirname(self.target_path), exist_ok=True)
-        if not os.path.exists(self.target_path):
-            os.symlink(self.source_path, self.target_path)
+        path = j(self.target_root, self.target_path)
+        log.debug("mkdir %r", os.path.dirname(path))
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        if not os.path.exists(path):
+            log.info("link %r -> %r", path, self.source_path)
+            os.symlink(self.source_path, path)
         else:
-            if os.path.islink(self.target_path):
-                linkto = os.readlink(self.target_path)
+            if os.path.islink(path):
+                linkto = os.readlink(path)
                 if linkto == self.source_path:
                     pass  # ok
                 else:
                     log.info("target %r links to %r instead %r",
-                             self.target_path, linkto, self.source_path)
+                             path, linkto, self.source_path)
             else:
                 log.info("non-link file %r already exists",
-                         self.target_path)
+                         path)
+
+    def clean(self):
+        path = j(self.target_root, self.target_path)
+        if not os.path.exists(path):
+            return
+        if os.path.islink(path):
+            linkto = os.readlink(path)
+            if linkto == self.source_path:
+                log.info("unlink %r", path)
+                os.unlink(path)
+            else:
+                log.info("unlink %r -> %r, no source, not removed",
+                         self.source_path, path)
+        else:
+            log.info("non-link file %r", self.target_path)
+
+    def show(self):
+        log.info("link %r -> %r", self.abspath, self.source_path)
 
 
-def do_sync(target, sources):
-    # D("%r %r", target, sources)
+def gather(target_root, source_roots):
     target_files = []
-    for source in sources:
-        for top, _, files in os.walk(source):
+    for source_root in source_roots:
+        for top, _, files in os.walk(source_root):
             for file in files:
                 source_path = j(top, file)
-                rpath = os.path.relpath(source_path, source)
-                target_files.append(TargetFile(j(target, rpath), source_path))
-    # link files
+                rpath = os.path.relpath(source_path, source_root)
+                target_files.append(TargetFile(target_root, rpath, source_path))
+    return target_files
+
+
+def do_linking(target_files):
     for file in target_files:
         file.link()
 
 
-def main(argv=sys.argv[1:]):
-    # set configuration
-    cfg = CFG
-    # process arguments
-    args = ARGS.parse_args(argv)
-    cfg["debug"] = args.debug
+def do_clean(target_files):
+    clean_dirs = set()
+    for file in target_files:
+        file.clean()
+        clean_dirs.add(os.path.dirname(file.abspath))
+    for dir in clean_dirs:
+        try:
+            os.rmdir(dir)
+            log.info("rmdir %r", dir)
+        except OSError:
+            pass  # cannot remove, ok
+
+
+def do_show(target_files):
+    for file in target_files:
+        file.show()
+
+
+def init_logging(args):
     if args.debug:
         logging.basicConfig(level=logging.DEBUG)
     else:
         logging.basicConfig(level=logging.INFO)
-    cfg["target"] = args.target
-    cfg["sources"] = args.sources
-    #
-    do_sync(args.target, args.sources)
+
+
+def main(argv=sys.argv[1:]):
+    args = ARGS.parse_args(argv)
+    init_logging(args)
+    target_files = gather(args.target, args.sources)
+    if args.clean:
+        do_clean(target_files)
+    else:
+        do_linking(target_files)
