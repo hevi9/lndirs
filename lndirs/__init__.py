@@ -141,5 +141,7 @@ def main(argv=sys.argv[1:]):
     target_files = gather(args.target, args.sources)
     if args.clean:
         do_clean(target_files)
+    elif args.show:
+        do_show(target_files)
     else:
         do_linking(target_files)
