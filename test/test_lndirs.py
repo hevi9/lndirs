@@ -2,10 +2,30 @@ import lndirs
 import pytest
 import os
 import shutil
+import logging
+
+log = logging.getLogger(__name__)
+D = log.debug
 
 j = os.path.join
 ROOT = os.path.dirname(__file__)
 target = j(ROOT, "target")
+
+
+@pytest.fixture
+def target_tree(request):
+    print("FIX enter target_tree")
+
+    def fin():
+        print("FIX leave rmtree %r", target)
+        shutil.rmtree(target, ignore_errors=True)
+
+    request.addfinalizer(fin)
+    return target
+
+
+def test_test(target_tree):
+    print(target_tree)
 
 
 def test_import():
@@ -20,26 +40,23 @@ def test_version():
         lndirs.main(["--version"])
 
 
-def test_linking():
+def test_linking(target_tree):
     """ tree linking """
     lndirs.main(
-        ["-dt", j(ROOT, "target"),
+        ["-dt", target_tree,
          j(ROOT, "linking_multitree", "treeA"),
          j(ROOT, "linking_multitree", "treeB")]
     )
-    shutil.rmtree(target)
 
 
-def test_clean():
+def test_clean(target_tree):
     """ tree cleaning """
-    lndirs.main(["-dt", j(ROOT, "target"),
-                 j(ROOT, "clean_tree")])
-    lndirs.main(["-dct", j(ROOT, "target"),
-                 j(ROOT, "clean_tree")])
-    assert len(os.listdir(j(ROOT,"target"))) == 0
+    lndirs.main(["-dt", target_tree, j(ROOT, "clean_tree")])
+    lndirs.main(["-dct", target_tree, j(ROOT, "clean_tree")])
+    assert len(os.listdir(target_tree)) == 0
 
 
-def test_show():
+def test_show(target_tree):
     """ show trees to be linked """
-    lndirs.main(["-dst", j(ROOT, "target"),
+    lndirs.main(["-dst", target_tree,
                  j(ROOT, "linking_multitree")])

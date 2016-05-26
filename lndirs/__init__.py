@@ -84,11 +84,23 @@ class TargetFile:
             if linkto == self.source_path:
                 log.info("unlink %r", path)
                 os.unlink(path)
+                self.clean_dir(os.path.dirname(path))
             else:
                 log.info("unlink %r -> %r, no source, not removed",
                          self.source_path, path)
         else:
             log.info("non-link file %r", self.target_path)
+
+    def clean_dir(self, dir):
+        if os.path.relpath(dir, self.target_root)[0] == '.':
+            return
+        try:
+            os.rmdir(dir)
+            log.info("rmdir %r", dir)
+        except OSError:
+            return
+        self.clean_dir(os.path.dirname(dir))
+
 
     def show(self):
         log.info("link %r -> %r", self.abspath, self.source_path)
@@ -111,17 +123,8 @@ def do_linking(target_files):
 
 
 def do_clean(target_files):
-    clean_dirs = set()
     for file in target_files:
         file.clean()
-        clean_dirs.add(os.path.dirname(file.abspath))
-    for dir in clean_dirs:
-        try:
-            os.rmdir(dir)
-            log.info("rmdir %r", dir)
-        except OSError:
-            pass  # cannot remove, ok
-
 
 def do_show(target_files):
     for file in target_files:
