@@ -45,9 +45,9 @@ ARGS.add_argument("sources",
 
 class TargetFile:
     def __init__(self, target_root, target_path, source_path):
-        self.target_root = target_root
-        self.target_path = target_path  # relative to root
-        self.source_path = source_path
+        self.target_root = os.path.abspath(target_root)
+        self.target_path = target_path  # relative to root or None XXX
+        self.source_path = os.path.abspath(source_path)
 
     def __repr__(self):
         return "%r -> %r" % (self.target_path, self.source_path)
@@ -58,22 +58,37 @@ class TargetFile:
 
     def link(self):
         path = j(self.target_root, self.target_path)
-        log.debug("mkdir %r", os.path.dirname(path))
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        if not os.path.exists(path):
+        self.make_dirs(os.path.dirname(path))
+        if not os.path.lexists(path):
             log.info("link %r -> %r", path, self.source_path)
             os.symlink(self.source_path, path)
         else:
             if os.path.islink(path):
                 linkto = os.readlink(path)
                 if linkto == self.source_path:
-                    pass  # ok
+                    pass
+                    #log.debug("link %r -> %r already exists", path,
+                    #          self.source_path)
                 else:
                     log.info("target %r links to %r instead %r",
                              path, linkto, self.source_path)
             else:
                 log.info("non-link file %r already exists",
                          path)
+
+    def make_dirs(self, dir):
+        try:
+            if not os.path.exists(os.path.dirname(dir)):
+                self.make_dirs(os.path.dirname(dir))
+        except FileExistsError:
+            pass
+        try:
+            os.mkdir(dir)
+            log.debug("mkdir %r", dir)
+        except FileExistsError:
+            pass
+        except OSError as ex:
+            raise
 
     def clean(self):
         path = j(self.target_root, self.target_path)
@@ -101,7 +116,6 @@ class TargetFile:
             return
         self.clean_dir(os.path.dirname(dir))
 
-
     def show(self):
         log.info("link %r -> %r", self.abspath, self.source_path)
 
@@ -109,6 +123,16 @@ class TargetFile:
 def gather(target_root, source_roots):
     target_files = []
     for source_root in source_roots:
+        if not os.path.isdir(source_root):
+            if os.path.isabs(source_root):
+                target_files.append(
+                    TargetFile(target_root, os.path.basename(source_root),
+                               source_root))
+            else:
+                target_files.append(
+                    TargetFile(target_root, source_root,
+                               os.path.abspath(source_path)))
+            continue
         for top, _, files in os.walk(source_root):
             for file in files:
                 source_path = j(top, file)
@@ -125,6 +149,7 @@ def do_linking(target_files):
 def do_clean(target_files):
     for file in target_files:
         file.clean()
+
 
 def do_show(target_files):
     for file in target_files:
