@@ -107,7 +107,7 @@ class TargetFile:
             log.info("non-link file %r", self.target_path)
 
     def clean_dir(self, dir):
-        if os.path.relpath(dir, self.target_root)[0] == '.':
+        if os.path.relpath(dir, self.target_root) == '.':
             return
         try:
             os.rmdir(dir)
@@ -123,6 +123,8 @@ class TargetFile:
 def gather(target_root, source_roots):
     target_files = []
     for source_root in source_roots:
+        if not os.path.exists(source_root):
+            raise FileNotFoundError(source_root)
         if not os.path.isdir(source_root):
             if os.path.isabs(source_root):
                 target_files.append(
@@ -131,7 +133,7 @@ def gather(target_root, source_roots):
             else:
                 target_files.append(
                     TargetFile(target_root, source_root,
-                               os.path.abspath(source_path)))
+                               os.path.abspath(source_root)))
             continue
         for top, _, files in os.walk(source_root):
             for file in files:
@@ -166,7 +168,11 @@ def init_logging(args):
 def main(argv=sys.argv[1:]):
     args = ARGS.parse_args(argv)
     init_logging(args)
-    target_files = gather(args.target, args.sources)
+    try:
+        target_files = gather(args.target, args.sources)
+    except FileNotFoundError as ex:
+        log.error("no file %r", str(ex))
+        return 1
     if args.clean:
         do_clean(target_files)
     elif args.show:
