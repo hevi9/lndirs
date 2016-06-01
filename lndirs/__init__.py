@@ -67,7 +67,7 @@ class TargetFile:
                 linkto = os.readlink(path)
                 if linkto == self.source_path:
                     pass
-                    #log.debug("link %r -> %r already exists", path,
+                    # log.debug("link %r -> %r already exists", path,
                     #          self.source_path)
                 else:
                     log.info("target %r links to %r instead %r",
@@ -168,6 +168,9 @@ def init_logging(args):
 def main(argv=sys.argv[1:]):
     args = ARGS.parse_args(argv)
     init_logging(args)
+    if os.path.exists(args.target) and not os.path.isdir(args.target):
+        log.error("target tree %r is not directory", args.target)
+        return 1
     try:
         target_files = gather(args.target, args.sources)
     except FileNotFoundError as ex:

@@ -21,6 +21,19 @@ def target_tree(request):
     return target
 
 
+@pytest.fixture
+def target_file(request):
+    file = j(target, "target_file.txt")
+    os.makedirs(target, exist_ok=True)
+    open(file, 'a').close()
+
+    def fin():
+        shutil.rmtree(target, ignore_errors=True)
+
+    request.addfinalizer(fin)
+    return file
+
+
 @pytest.fixture(scope="session")
 def src_base(request):
     class files:
@@ -88,18 +101,26 @@ def test_link_rel(target_tree):
 def test_link_file(target_tree, src_base):
     """ Link plain file to target tree """
     lndirs.main(["-dt", target_tree, src_base.file1])
-    assert os.readlink(j(target_tree, os.path.basename(src_base.file1))) == src_base.file1
+    assert os.readlink(
+        j(target_tree, os.path.basename(src_base.file1))) == src_base.file1
 
 
-def test_link_target_file_fail(target_tree):
+def test_link_target_file_fail(target_file, src_base):
     """ Fail link to target if target is file """
+    rc = lndirs.main(["-dt", target_file, src_base.tree])
+    assert rc == 1
 
 
+def test_link_fail_no_source(target_tree):
+    """ Fail link if no source entry """
+    rc = lndirs.main(["-dt", target_tree, "/does/not/exists"])
+    assert rc == 1
 
-def test_clean(target_tree):
+
+def test_clean(target_tree, src_base):
     """ tree cleaning """
-    lndirs.main(["-dt", target_tree, j(ROOT, "clean_tree")])
-    lndirs.main(["-dct", target_tree, j(ROOT, "clean_tree")])
+    lndirs.main(["-dt", target_tree, src_base.tree])
+    lndirs.main(["-dct", target_tree, src_base.tree])
     assert len(os.listdir(target_tree)) == 0
 
 
