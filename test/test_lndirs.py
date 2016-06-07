@@ -124,7 +124,6 @@ def test_clean(target_tree, src_base):
     assert len(os.listdir(target_tree)) == 0
 
 
-def test_show(target_tree):
+def test_show(target_tree, src_base):
     """ show trees to be linked """
-    lndirs.main(["-dst", target_tree,
-                 j(ROOT, "linking_multitree")])
+    lndirs.main(["-dst", target_tree, src_base.tree])
