@@ -127,3 +127,11 @@ def test_clean(target_tree, src_base):
 def test_show(target_tree, src_base):
     """ show trees to be linked """
     lndirs.main(["-dst", target_tree, src_base.tree])
+
+
+def tbd_test_remove_nonsource_links():
+    """ Remove target links to source tree where source file does not exits
+    anymore. """
+
+def tbd_test_overlapping_trees():
+    """ Check if thees, target and sources overlaps """
